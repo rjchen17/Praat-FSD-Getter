@@ -149,6 +149,8 @@ def combine_files(python_output, praat_output):
         praat_lines = praat_file.readlines()
     with open("combined_data.txt", "w") as my_file:
         for key, value in python_output.data.items():
+            if get_word_category(key) == 0:
+                continue
             my_file.write(key + "\n")
             word_duration = value[1] - value[0]
             my_file.write("Word duration: " + str(word_duration) + "\n")
@@ -160,10 +162,15 @@ def combine_files(python_output, praat_output):
                 my_file.write(praat_lines[line_index])
                 line_index += 1
 def txt_to_csv(file):
+    new_file_lines = ""
     with open(file, "r") as my_file:
         lines = my_file.readlines()
-    for i in range(10):
-        print(lines[i])
+    for line in lines:
+        if line != "\n":
+            line = line[0:-1] + ","
+        new_file_lines += line
+    with open("csv.txt", "w") as new_file:
+        new_file.write(new_file_lines)
 
 if __name__ == "__main__":
     x = preprocess_file("019-2_2_part_2.TextGrid", True)
