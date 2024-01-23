@@ -1,3 +1,5 @@
+import streamlit as st
+import subprocess
 class WordDictionary:
     def __init__(self):
         self.data = {}  # A dictionary that maps a word to a start and end time
@@ -58,8 +60,6 @@ def preprocess_file(file, modify=False):
     solely the phonemes. This function would run faster if the word tier was above the phoneme tier. But, considering
     speed is not a problem (for now), we save time by not manually changing all the files.
     """
-    begin_copy = False
-    to_copy = ""
     word_boundary = False
     word_data = WordDictionary()  # This will be the durations of all the words
     current_word_data = []  # This stores the xmin and xmax of the current word
@@ -73,8 +73,6 @@ def preprocess_file(file, modify=False):
             line = line.strip()
             if line == "name = \"sentence - words\"":
                 word_tier = True
-            #if line == "item [2]:":
-              #  begin_copy = True  # TODO
 
             if word_tier:
                 if line[0:4] == "item":
@@ -171,8 +169,15 @@ def txt_to_csv(file):
         new_file_lines += line
     with open("csv.txt", "w") as new_file:
         new_file.write(new_file_lines)
-
+def subprocess_test():
+    subprocess.run(["C:\Praat.exe"])
 if __name__ == "__main__":
     x = preprocess_file("019-2_2_part_2.TextGrid", True)
     combine_files(x, "script_output.txt")
     txt_to_csv("combined_data.txt")
+header = st.container()
+with header:
+    st.title("This is a test")
+    if st.button("Click me!"):
+        subprocess_test()
+
