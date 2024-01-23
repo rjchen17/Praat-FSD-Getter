@@ -172,7 +172,7 @@ def txt_to_csv(file):
     with open("csv.txt", "w") as new_file:
         new_file.write(new_file_lines)
 def subprocess_test():
-    subprocess.run([f"{sys.executable}","C:\Praat.exe"])
+    subprocess.run(["C:\Praat.exe"])
 '''if __name__ == "__main__":
     x = preprocess_file("019-2_2_part_2.TextGrid", True)
     combine_files(x, "script_output.txt")
