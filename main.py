@@ -1,5 +1,7 @@
 import streamlit as st
 import subprocess
+import sys
+
 class WordDictionary:
     def __init__(self):
         self.data = {}  # A dictionary that maps a word to a start and end time
@@ -170,11 +172,11 @@ def txt_to_csv(file):
     with open("csv.txt", "w") as new_file:
         new_file.write(new_file_lines)
 def subprocess_test():
-    subprocess.run(["C:\Praat.exe"])
-if __name__ == "__main__":
+    subprocess.run([f"{sys.executable}","C:\Praat.exe"])
+'''if __name__ == "__main__":
     x = preprocess_file("019-2_2_part_2.TextGrid", True)
     combine_files(x, "script_output.txt")
-    txt_to_csv("combined_data.txt")
+    txt_to_csv("combined_data.txt")'''
 header = st.container()
 with header:
     st.title("This is a test")
