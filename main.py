@@ -1,6 +1,7 @@
-import streamlit as st
 import subprocess
 import sys
+import tkinter as tk
+from tkinter import filedialog
 
 class WordDictionary:
     def __init__(self):
@@ -172,14 +173,50 @@ def txt_to_csv(file):
     with open("csv.txt", "w") as new_file:
         new_file.write(new_file_lines)
 def subprocess_test():
-    subprocess.run([f"{sys.executable}","C:\Praat.exe"])
-'''if __name__ == "__main__":
-    x = preprocess_file("019-2_2_part_2.TextGrid", True)
-    combine_files(x, "script_output.txt")
-    txt_to_csv("combined_data.txt")'''
-header = st.container()
-with header:
-    st.title("This is a test")
-    if st.button("Click me!"):
-        subprocess_test()
+    subprocess.run(["C:\Praat.exe"])
+def main():
+    print("Select where your Praat.exe file is located")
+    while True:
+        praat_location = filedialog.askopenfilename()
+        if praat_location[-9:] == "Praat.exe":
+            print("Success!")
+            print("Praat found at: " + praat_location)
+            print()
+            break
+        else:
+            print("Praat not found, please try again.")
+
+    print("Select both the sound and TextGrid file to be analyzed")
+    sound_file_found = False
+    textgrid_file_found = False
+    while True:
+        files = filedialog.askopenfilenames()
+        if len(files) != 2:
+            print("Please select exactly two files")
+            continue
+        else:
+            for file in files:
+                if file[-3:] == ".wav":
+                    sound_file = file
+                    sound_file_found = True
+                else:
+                    textgrid_file = file
+                    textgrid_file_found = True
+        if not sound_file_found or not textgrid_file_found:
+            print("Files not found, please try again.")
+            continue
+        print("Success!")
+        print("Sound file found at: " + sound_file)
+        print("TextGrid file found at: " + textgrid_file)
+        print()
+        break
+
+
+
+if __name__ == "__main__":
+    main()
+    #x = preprocess_file("019-2_2_part_2.TextGrid", True)
+    #combine_files(x, "script_output.txt")
+    #txt_to_csv("combined_data.txt")
+
 
