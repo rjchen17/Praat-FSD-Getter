@@ -175,6 +175,7 @@ def txt_to_csv(file):
 def subprocess_test():
     subprocess.run(["C:\Praat.exe"])
 def main():
+    # Get location of Praat
     print("Select where your Praat.exe file is located")
     while True:
         praat_location = filedialog.askopenfilename()
@@ -185,7 +186,8 @@ def main():
             break
         else:
             print("Praat not found, please try again.")
-
+    # Get location of .wav and .TextGrid
+    # Note that this does not work with a .txt or .mp3, for example
     print("Select both the sound and TextGrid file to be analyzed")
     sound_file_found = False
     textgrid_file_found = False
@@ -196,20 +198,24 @@ def main():
             continue
         else:
             for file in files:
-                if file[-3:] == ".wav":
+                if file[-3:] == "wav":
                     sound_file = file
                     sound_file_found = True
-                else:
+                elif file[-4:] == "Grid":
                     textgrid_file = file
                     textgrid_file_found = True
         if not sound_file_found or not textgrid_file_found:
             print("Files not found, please try again.")
+            for file in files:
+                print(file[-3:])
             continue
         print("Success!")
         print("Sound file found at: " + sound_file)
         print("TextGrid file found at: " + textgrid_file)
         print()
         break
+    subprocess.run([praat_location, "--open", sound_file])
+
 
 
 
