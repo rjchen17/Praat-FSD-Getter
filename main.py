@@ -2,6 +2,8 @@ import subprocess
 import sys
 import tkinter as tk
 from tkinter import filedialog
+import os
+import pickle
 
 class WordDictionary:
     def __init__(self):
@@ -143,23 +145,45 @@ def preprocess_file(file, modify=False):
                 if buffer > 0:
                     buffer -= 1
                 new_file.write(line + "\n")
-    return word_data
+    with open(file + '.pickle', 'wb') as word_data_file:
+        pickle.dump(word_data, word_data_file, protocol = pickle.HIGHEST_PROTOCOL) # TODO: check highest_protocl
 def combine_files(python_output, praat_output):
+    with open(python_output, 'rb') as pickle_file:
+        word_data = pickle.load(pickle_file)
     line_index = 0
     with open(praat_output, "r") as praat_file:
         praat_lines = praat_file.readlines()
-    with open("combined_data.txt", "w") as my_file:
-        for key, value in python_output.data.items():
+
+    file_name = "combined_data"
+    while os.path.exists(file_name + ".txt"):
+        try:
+            file_count = int(file_name[13:])
+        except ValueError:
+            file_name += "1"
+            continue
+        file_count += 1
+        file_name = "combined_data" + str(file_count)
+
+    with open(file_name + ".txt", "w") as my_file:
+        for key, value in word_data.data.items():
             if get_word_category(key) == 0:
                 continue
             my_file.write(key + "\n")
             word_duration = value[1] - value[0]
             my_file.write("Word duration: " + str(word_duration) + "\n")
+
+            closure_check = True # Used to write "Closure: " if there is no closure present, for data processing purposes
             while True:
+                if closure_check:
+                    if praat_lines[line_index][0:3] != "Clo":
+                        my_file.write("Closure: \n")
+                    closure_check = False
+
                 if praat_lines[line_index] == "\n":
                     line_index += 1
                     my_file.write("\n")
                     break
+
                 my_file.write(praat_lines[line_index])
                 line_index += 1
 def txt_to_csv(file):
@@ -170,10 +194,11 @@ def txt_to_csv(file):
         if line != "\n":
             line = line[0:-1] + ","
         new_file_lines += line
-    with open("csv.txt", "w") as new_file:
+    with open("csv.csv", "w") as new_file:
         new_file.write(new_file_lines)
 def subprocess_test():
     subprocess.run(["C:\Praat.exe"])
+
 def main():
     # Get location of Praat
     print("Select where your Praat.exe file is located")
@@ -215,14 +240,17 @@ def main():
         print()
         break
     subprocess.run([praat_location, "--open", sound_file])
-
+def main2():
+    subprocess.Popen(["C:/Users/rober/Documents/Praat.exe", "--open", ["C:/Users/rober/Downloads/016_3(1).TextGrid","C:/Users/rober/Downloads/019-2_2_part_2.wav"]])
+    #subprocess.Popen(["C:/Users/rober/Documents/Praat.exe", "--open", ])
+    os.system("C:/Users/rober/Documents/Praat.exe" + " --open " + "C:/Users/rober/Downloads/016_3(1).TextGrid")
+    os.system("C:/Users/rober/Documents/Praat.exe" + " --open " + "C:/Users/rober/Downloads/016_3(1).TextGrid")
 
 
 
 if __name__ == "__main__":
-    main()
-    #x = preprocess_file("019-2_2_part_2.TextGrid", True)
-    #combine_files(x, "script_output.txt")
+    #main2()
+    file_name = '019-2_2_part_2'
+    preprocess_file(file_name + ".TextGrid", True)
+    combine_files(file_name + ".TextGrid.pickle", "script_output.txt")
     #txt_to_csv("combined_data.txt")
-
-
