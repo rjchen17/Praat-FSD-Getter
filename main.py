@@ -7,7 +7,7 @@ import pickle
 class WordDictionary:
     def __init__(self):
         self.data = {}  # A dictionary that maps a word to a start and end time
-        self.counter = {}  # A dictionary that tracks the amount of occurences of each word
+        self.counter = {}  # A dictionary that tracks the amount of occurrences of each word
 
     def add(self, entry):
         if entry[2] in self.counter:
@@ -25,13 +25,13 @@ class WordDictionary:
             return_string += "End: " + str(value[1]) + "s\n\n"
         return return_string
 
-    def getKey(self, n): # Gets key at index
+    def get_key(self, n): # Gets key at index
         for i, key in enumerate(self.data.keys()):
             if n == i:
                 return key
 
     def getValue(self, n): # Gets value at index
-        key = self.getKey(n)
+        key = self.get_key(n)
         return self.data[key]
 
 
@@ -56,9 +56,9 @@ def file_namer(file_name, handle, path: '') -> str:  # TODO: Implement keyword a
     file_counter = 0
     if os.path.exists(path + file_name + handle):
         return file_name + handle
-    while os.path.exists(path + file_name + handle + str(file_counter)):
+    while os.path.exists(path + file_name + str(file_counter) + handle):
         file_counter += 1
-    return file_name + handle + str(file_counter)
+    return path + file_name + str(file_counter) + handle
 
 
 def get_word_category(word: str):
@@ -83,7 +83,7 @@ def get_word_category(word: str):
     return 0
 
 
-def preprocess_file(file, modify=False):
+def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
     """
     This function preprocesses a TextGrid file for later Praat script processing. While it is possible to process
     the files solely with scripting, it would be more time consuming. Here, this script will mark target phonemes
@@ -97,7 +97,11 @@ def preprocess_file(file, modify=False):
     index_to_check = 12  # We want to check for even intervals. With single digit intervals, we just check the only
     # digit present. But, when we hit interval 8, we need to check the digit after on the next
     # interval.
-    with open(file, "r") as my_file:
+    if "/" in file_path:
+        file_pickle_path = file_path.split("/")[1]
+    elif "\\" in file_path:
+        file_pickle_path = file_path.split("\\")[1]
+    with open(file_path, "r") as my_file:
         word_tier = False
         lines = my_file.readlines()
         for line in lines:
@@ -125,77 +129,88 @@ def preprocess_file(file, modify=False):
                     if interval_number in [9, 99, 999]:
                         index_to_check += 1
     current_word_index = 0
-    buffer = 0  # TODO FIX THIS, it's very stupid (but it works).
     if modify:
-        file_name = file_namer("modified_file", ".TextGrid", "Preprocessed files/")
-        with open("Preprocessed files/" + file_name, "w") as new_file:
-            current_key = word_data.getKey(current_word_index)
+        file_name = file_namer("modified_file", ".TextGrid", output_path)
+        dictionary_exhausted = False
+        with open(file_name, "w") as new_file:
+            current_key = word_data.get_key(current_word_index)
             current_word = current_key.partition("_")[0]
             word_category = get_word_category(current_word)
-            modified = False
             for line in lines:
                 line = line.strip()
                 if word_category == 0:
-                    modified = True
-
+                    pass
                 if word_category == 1:
                     if line[8:11].lower() == "c1r" or line[8:10].lower() == "c1":
                         line = "text = \"t\""
-                        modified = True
-                        buffer = 12
 
                 if word_category == 2:
                     if line[8:11].lower() == "c2c":
                         line = "text = \"tc\""
                     if line[8:11].lower() == "c2r":
                         line = "text = \"t\""
-                        modified = True
 
                 if word_category == 3:
-                    if line[8:10] == "C1":
+                    if line[8:10].lower() == "c1":
                         line = "text = \"t\""
-                        modified = True
-                        buffer = 12
 
                 if word_category == 4:
-                    if line[8:10] == "C2":
+                    if line[8:10].lower() == "c2":
                         line = "text = \"t\""
-                        modified = True
+
                 if current_word_index == len(word_data.data) - 1:
-                    modified = False
-                if modified and buffer == 0:
-                    current_word_index += 1
-                    current_key = word_data.getKey(current_word_index)
-                    current_word = current_key.partition("_")[0]
-                    word_category = get_word_category(current_word)
-                    modified = False
-                if buffer > 0:
-                    buffer -= 1
+                    dictionary_exhausted = True
+                if not dictionary_exhausted:
+                    try:
+                        if line[7:12] == str(word_data.data[current_key][1])[0:5]:  # Account for precision problems
+                            current_word_index += 1
+                            current_key = word_data.get_key(current_word_index)
+                            current_word = current_key.partition("_")[0]
+                            word_category = get_word_category(current_word)
+
+                    except IndexError:
+                        print("Error")
+                        pass
                 new_file.write(line + "\n")
-                print(current_word + "////" + line)
-                print(word_data.data[current_key])
-    with open(file + '.pickle', 'wb') as word_data_file:
-        pickle.dump(word_data, word_data_file, protocol=pickle.HIGHEST_PROTOCOL)  # TODO: check highest_protocl
+                # DEBUG:
+                print(current_key + "///" + str(word_data.data[current_key][1]))
+                print(line)
+    with open(pickle_path + file_pickle_path + '.pickle', 'wb') as word_data_file:
+        pickle.dump(word_data, word_data_file, protocol=pickle.HIGHEST_PROTOCOL)  # TODO: check highest_protocol
 
 
 def combine_files(python_output, praat_output):
+    """ Combines python and praat outputs into a readable file
+
+    :param python_output: A pickle file that can be loaded into a dictionary
+    :param praat_output: A .txt file returned from extraction.praat
+    :return: A readable .txt file
+    """
     with open(python_output, 'rb') as pickle_file:
         word_data = pickle.load(pickle_file)
     line_index = 0
     with open(praat_output, "r") as praat_file:
         praat_lines = praat_file.readlines()
 
-    file_name = file_namer("combined_data", ".txt")
+    file_name = file_namer("combined_data", ".txt", path="Readable outputs/")
 
-    with open(file_name + ".txt", "w") as my_file:
+    with open(file_name, "w", encoding='utf8') as my_file:
         for key, value in word_data.data.items():
-            if get_word_category(key) == 0:
+            word_category = get_word_category(key)
+            if word_category== 0:
                 continue
             my_file.write(key + "\n")
+            # IPA Unicode conversion based on UCL system
+            if word_category > 2:
+                my_file.write("Phone: ʂ\n")
+            else:
+                my_file.write("Phone: ʈʂ\n")
+
             word_duration = value[1] - value[0]
             my_file.write("Word duration: " + str(word_duration) + "\n")
 
-            closure_check = True  # Used to write "Closure: " if there is no closure present, for data processing purposes
+            closure_check = True  # Used to write "Closure: " if there is no closure present,
+                                  # for data processing purposes
             while True:
                 if closure_check:
                     if praat_lines[line_index][0:3] != "Clo":
@@ -210,21 +225,27 @@ def combine_files(python_output, praat_output):
                 my_file.write(praat_lines[line_index])
                 line_index += 1
 
+def txt_to_csv(file_path, output_path):
 
-def txt_to_csv(file):
+
     new_file_lines = ""
-    with open(file, "r") as my_file:
+    with open(file_path, "r", encoding='utf8') as my_file:
         lines = my_file.readlines()
     for line in lines:
         if line != "\n":
+            split_line = line.split(":")
+            if len(split_line) > 1:
+                line = split_line[1][1:]
+
             line = line[0:-1] + ","
         new_file_lines += line
-    with open("csv.csv", "w") as new_file:
+    file_name = file_namer("output", ".csv", output_path)
+    with open(file_name, "w", encoding='utf8') as new_file:
         new_file.write(new_file_lines)
 
 
 def subprocess_test():
-    subprocess.run(["C:\Praat.exe"])
+    subprocess.run(["C:/Praat.exe"])
 
 
 def main():
@@ -280,10 +301,11 @@ def main2():
 
 if __name__ == "__main__":
     # main2()
-    files = os.listdir("Tests")
-    for file in files:
-        if file[-1] == "d":
-            preprocess_file("Tests/" + file, True)
-
-    # combine_files(file_name + ".TextGrid.pickle", "script_output.txt")
-    # txt_to_csv("combined_data.txt")
+    # files = os.listdir("Tests")
+    # for file in files:
+    #     if file[-1] == "d":
+    #         preprocess_file("Tests/" + file, True)
+    preprocess_file("Tests/019-2_2_part_2.TextGrid", modify=True,
+                    output_path="Preprocessed files/", pickle_path="Pickles/")
+    combine_files("Pickles/019-2_2_part_2" + ".TextGrid.pickle", "script_output.txt")
+    txt_to_csv("Readable outputs/combined_data10.txt", "csv files/")
