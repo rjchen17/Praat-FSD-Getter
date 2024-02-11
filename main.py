@@ -2,7 +2,7 @@ import subprocess
 from tkinter import filedialog
 import os
 import pickle
-
+import pandas as pd
 
 class WordDictionary:
     def __init__(self):
@@ -34,31 +34,19 @@ class WordDictionary:
         key = self.get_key(n)
         return self.data[key]
 
-
-# def file_namer(file_name: str, handle: str) -> str:
-#     base_name = file_name
-#     while os.path.exists(file_name + handle):
-#         try:
-#             file_count = int(file_name[13:])
-#         except ValueError:
-#             file_name += "1"
-#             continue
-#         file_count += 1
-#         file_name = base_name + str(file_count)
-#     return file_name + handle
-def file_namer(file_name, handle, path: '') -> str:  # TODO: Implement keyword argument
+def file_namer(file_name, handle, output_path: '') -> str:  # TODO: Implement keyword argument
     ''' Test
     :param file_name:
     :param handle:
-    :param path:
+    :param output_path:
     :return:
     '''
     file_counter = 0
-    if os.path.exists(path + file_name + handle):
+    if os.path.exists(output_path + file_name + handle):
         return file_name + handle
-    while os.path.exists(path + file_name + str(file_counter) + handle):
+    while os.path.exists(output_path + file_name + str(file_counter) + handle):
         file_counter += 1
-    return path + file_name + str(file_counter) + handle
+    return output_path + file_name + str(file_counter) + handle
 
 
 def get_word_category(word: str):
@@ -176,7 +164,11 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
                 print(current_key + "///" + str(word_data.data[current_key][1]))
                 print(line)
     with open(pickle_path + file_pickle_path + '.pickle', 'wb') as word_data_file:
-        pickle.dump(word_data, word_data_file, protocol=pickle.HIGHEST_PROTOCOL)  # TODO: check highest_protocol
+        try:
+            pickle.dump(word_data, word_data_file, protocol=pickle.HIGHEST_PROTOCOL)  # TODO: check highest_protocol
+        except:
+            print("Pickle error. Your version of Python may be outdated. ")
+            raise ValueError # TODO: Temp
 
 
 def combine_files(python_output, praat_output):
@@ -192,7 +184,7 @@ def combine_files(python_output, praat_output):
     with open(praat_output, "r") as praat_file:
         praat_lines = praat_file.readlines()
 
-    file_name = file_namer("combined_data", ".txt", path="Readable outputs/")
+    file_name = file_namer("combined_data", ".txt", output_path="Readable outputs/")
 
     with open(file_name, "w", encoding='utf8') as my_file:
         for key, value in word_data.data.items():
@@ -243,7 +235,36 @@ def txt_to_csv(file_path, output_path):
     with open(file_name, "w", encoding='utf8') as new_file:
         new_file.write(new_file_lines)
 
+def csv_to_xlsx(file_path, output_path='', mode='a', append_target=None):
+    """ Converts from a .csv to a .xlsx file
 
+    :param file_path: The file to be written to xlsx
+    :param output_path: NOT IMPLEMENTED
+    :param mode: The mode of the function. 'w' for write, 'a' for append
+    :param append_target: If append mode is selected, file_path will be appended to append_target
+    :return:
+    """
+
+    if mode == 'a':
+        try:
+            pd.read_excel(append_target)
+        except ValueError:
+            print("With append mode selected, please choose a file to append to. ")
+            raise ValueError
+        except FileNotFoundError:
+            print("Append target not found. ")
+            raise FileNotFoundError
+
+    file_without_handle = file_path.split(".")[0]
+    input_df = pd.read_csv(file_path)
+    if mode == 'w':
+        input_df.to_excel(file_without_handle + ".xlsx", index=False)
+    if mode == 'a':
+        # TODO: Investigate efficiency of appending to large files. read_excel seems to slow down as file gets bigger
+        # https://stackoverflow.com/questions/28766133/faster-way-to-read-excel-files-to-pandas-dataframe
+        append_target_df = pd.read_excel(append_target)
+        output_df = pd.concat([input_df, append_target_df])
+        output_df.to_excel(file_without_handle + ".xlsx", index=False)
 def subprocess_test():
     subprocess.run(["C:/Praat.exe"])
 
@@ -305,7 +326,8 @@ if __name__ == "__main__":
     # for file in files:
     #     if file[-1] == "d":
     #         preprocess_file("Tests/" + file, True)
-    preprocess_file("Tests/019-2_2_part_2.TextGrid", modify=True,
-                    output_path="Preprocessed files/", pickle_path="Pickles/")
-    combine_files("Pickles/019-2_2_part_2" + ".TextGrid.pickle", "script_output.txt")
-    txt_to_csv("Readable outputs/combined_data10.txt", "csv files/")
+    #preprocess_file("Tests/019-2_2_part_2.TextGrid", modify=True,
+    #                output_path="Preprocessed files/", pickle_path="Pickles/")
+    #combine_files("Pickles/019-2_2_part_2" + ".TextGrid.pickle", "script_output.txt")
+    #txt_to_csv("Readable outputs/combined_data10.txt", "csv files/")
+    csv_to_xlsx("csv files/output7.csv", mode='a', append_target='csv files/output7.xlsx')
