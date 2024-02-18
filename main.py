@@ -36,6 +36,7 @@ class WordDictionary:
 
 def file_namer(file_name, handle, output_path: '') -> str:  # TODO: Implement keyword argument
     ''' Test
+
     :param file_name:
     :param handle:
     :param output_path:
@@ -48,6 +49,11 @@ def file_namer(file_name, handle, output_path: '') -> str:  # TODO: Implement ke
         file_counter += 1
     return output_path + file_name + str(file_counter) + handle
 
+def file_splitter(file_name):
+    if "/" in file_name:
+        return file_name.split("/")[-1]
+    else:
+        return file_name.split("\\")[-1]
 
 def get_word_category(word: str):
     '''
@@ -57,7 +63,7 @@ def get_word_category(word: str):
     take "hongcha", which is a affricate second word. We need to replace "C2c" with "Tc" and "C2r" with "T".
     '''
     # Here, we exploit the fact that all syllables in pinyin are at least two letters (for the words present
-    # in the word-list.
+    # in the word-list).
     first_half = word[0:2]
     second_half = word[2:]
     if first_half == "ch":
@@ -85,10 +91,8 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
     index_to_check = 12  # We want to check for even intervals. With single digit intervals, we just check the only
     # digit present. But, when we hit interval 8, we need to check the digit after on the next
     # interval.
-    if "/" in file_path:
-        file_pickle_path = file_path.split("/")[1]
-    elif "\\" in file_path:
-        file_pickle_path = file_path.split("\\")[1]
+
+    file_pickle_path = file_splitter(file_path)
     with open(file_path, "r") as my_file:
         word_tier = False
         lines = my_file.readlines()
@@ -118,9 +122,10 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
                         index_to_check += 1
     current_word_index = 0
     if modify:
-        file_name = file_namer("modified_file", ".TextGrid", output_path)
+        #file_name = file_namer("modified_file", ".TextGrid", output_path)
         dictionary_exhausted = False
-        with open(file_name, "w") as new_file:
+        #with open(file_name, "w") as new_file:
+        with open(output_path + "mod" + file_pickle_path, "w") as new_file:
             current_key = word_data.get_key(current_word_index)
             current_word = current_key.partition("_")[0]
             word_category = get_word_category(current_word)
@@ -149,8 +154,11 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
                 if current_word_index == len(word_data.data) - 1:
                     dictionary_exhausted = True
                 if not dictionary_exhausted:
-                    try:
-                        if line[7:12] == str(word_data.data[current_key][1])[0:5]:  # Account for precision problems
+                    try: # TODO .1 second tolerance
+                        boundary_time = float(line[7:12])
+                        print(abs(boundary_time - word_data.data[current_key][1]))
+                        #if line[7:12] == str(word_data.data[current_key][1])[0:5]:  # Account for precision problems
+                        if abs(boundary_time - word_data.data[current_key][1]) < 0.14:
                             current_word_index += 1
                             current_key = word_data.get_key(current_word_index)
                             current_word = current_key.partition("_")[0]
@@ -158,6 +166,9 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
 
                     except IndexError:
                         print("Error")
+                        pass
+
+                    except ValueError:
                         pass
                 new_file.write(line + "\n")
                 # DEBUG:
@@ -171,7 +182,7 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
             raise ValueError # TODO: Temp
 
 
-def combine_files(python_output, praat_output):
+def combine_files(python_output, praat_output, output_path=''):
     """ Combines python and praat outputs into a readable file
 
     :param python_output: A pickle file that can be loaded into a dictionary
@@ -183,10 +194,10 @@ def combine_files(python_output, praat_output):
     line_index = 0
     with open(praat_output, "r") as praat_file:
         praat_lines = praat_file.readlines()
+    file_name = python_output[0:-16].split("/")[1] # TODO, this is gamey
+    #file_name = file_namer("combined_data", ".txt", output_path="Readable outputs/")
 
-    file_name = file_namer("combined_data", ".txt", output_path="Readable outputs/")
-
-    with open(file_name, "w", encoding='utf8') as my_file:
+    with open(output_path + file_name + '.txt', "w", encoding='utf8') as my_file:
         for key, value in word_data.data.items():
             word_category = get_word_category(key)
             if word_category== 0:
@@ -218,24 +229,36 @@ def combine_files(python_output, praat_output):
                 line_index += 1
 
 def txt_to_csv(file_path, output_path):
+    """
 
+    :param file_path:
+    :param output_path:
+    :return:
+    """
+    split_file = file_splitter(file_path) # Returns filename.handle
+    file_without_handle = split_file.split(".")[0] # Returns filename
 
-    new_file_lines = ""
+    new_file_lines = file_without_handle + ","
     with open(file_path, "r", encoding='utf8') as my_file:
         lines = my_file.readlines()
-    for line in lines:
+    for line in lines[0:-1]: # [0:-1] cuts off the last newline. Without doing so, we would have an
+                             # extra file_without_handle at the end"
         if line != "\n":
             split_line = line.split(":")
             if len(split_line) > 1:
                 line = split_line[1][1:]
 
             line = line[0:-1] + ","
-        new_file_lines += line
-    file_name = file_namer("output", ".csv", output_path)
+            new_file_lines += line
+        else:
+            new_file_lines += "\n"
+            new_file_lines += file_without_handle + ","
+
+    file_name = file_namer(file_without_handle, handle='.csv', output_path=output_path)
     with open(file_name, "w", encoding='utf8') as new_file:
         new_file.write(new_file_lines)
 
-def csv_to_xlsx(file_path, output_path='', mode='a', append_target=None):
+def csv_to_xlsx(file_path='', output_path='', mode='a', append_target=None, directory_path=None):
     """ Converts from a .csv to a .xlsx file
 
     :param file_path: The file to be written to xlsx
@@ -254,10 +277,34 @@ def csv_to_xlsx(file_path, output_path='', mode='a', append_target=None):
         except FileNotFoundError:
             print("Append target not found. ")
             raise FileNotFoundError
+    if mode == 'wd' and directory_path == None:
+        print("You must select a directory in wd mode. ")
+        raise ValueError
+    if mode != 'wd':
+        file_without_handle: str = file_path.split(".")[0] # Filename string
+        input_df = pd.read_csv(file_path, header=None)
+    column_names = ["file", "word", "phone", "word_dur", "closure_dur", "release_dur", "cog", "skew", "sd",
+                    "fricative_f3", "vowel", "f1_20", "f1_40", "f2_20", "f2_40", "f3_20", "f3_40", "UNK"]
 
-    file_without_handle = file_path.split(".")[0]
-    input_df = pd.read_csv(file_path)
+    if mode == 'wd':
+        files = os.listdir(directory_path)
+        directory_path += "/"
+        # TODO: fix slashes
+        complete_df = pd.read_csv(directory_path + files[0], header=None)
+        complete_df.columns = column_names
+        df_list = [complete_df]
+
+        for file in os.listdir(directory_path):
+            current_df = pd.read_csv(directory_path + file, header=None)
+            current_df.columns = column_names
+            df_list.append(current_df)
+        # TODO: Fix this:
+        complete_df = pd.concat(df_list, ignore_index=True)
+        complete_df.to_excel(directory_path + "complete_data.xlsx", index=False)
+
     if mode == 'w':
+        # TODO
+        input_df.columns = column_names
         input_df.to_excel(file_without_handle + ".xlsx", index=False)
     if mode == 'a':
         # TODO: Investigate efficiency of appending to large files. read_excel seems to slow down as file gets bigger
@@ -269,7 +316,7 @@ def subprocess_test():
     subprocess.run(["C:/Praat.exe"])
 
 
-def main():
+def main3():
     # Get location of Praat
     print("Select where your Praat.exe file is located")
     while True:
@@ -319,15 +366,26 @@ def main2():
     os.system("C:/Users/rober/Documents/Praat.exe" + " --open " + "C:/Users/rober/Downloads/016_3(1).TextGrid")
     os.system("C:/Users/rober/Documents/Praat.exe" + " --open " + "C:/Users/rober/Downloads/016_3(1).TextGrid")
 
+def main():
+    mode = input("[Pr]e or [Po]st Praat script?")
+    if input == "Pr":
+        pass
+    if input == "Po":
+        pass
 
 if __name__ == "__main__":
     # main2()
-    # files = os.listdir("Tests")
+    files = os.listdir("Tests")
+    for file in files:
+        print(file)
     # for file in files:
     #     if file[-1] == "d":
     #         preprocess_file("Tests/" + file, True)
-    #preprocess_file("Tests/019-2_2_part_2.TextGrid", modify=True,
-    #                output_path="Preprocessed files/", pickle_path="Pickles/")
-    #combine_files("Pickles/019-2_2_part_2" + ".TextGrid.pickle", "script_output.txt")
-    #txt_to_csv("Readable outputs/combined_data10.txt", "csv files/")
-    csv_to_xlsx("csv files/output7.csv", mode='a', append_target='csv files/output7.xlsx')
+    #preprocess_file("Tests/baseline_male_finished.TextGrid", modify=True,
+    #               output_path="Preprocessed files/", pickle_path="Pickles/")
+    #combine_files("Pickles/baseline_male_finished" + ".TextGrid.pickle", "Script Outputs/scroutmodbaseline_male_finished"
+    #              , output_path='Readable outputs/')
+    #txt_to_csv("Readable outputs/baseline_male_finished.txt", "csv files/")
+    #csv_to_xlsx("csv files/baseline_male_finished2.csv", mode='w', append_target='csv files/output9.xlsx')
+    csv_to_xlsx(directory_path='csv files', mode='wd')
+    # TODO standardize function docstrings
