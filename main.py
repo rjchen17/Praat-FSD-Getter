@@ -155,7 +155,7 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
                     dictionary_exhausted = True
                 if not dictionary_exhausted:
                     try: # TODO .1 second tolerance
-                        boundary_time = float(line[7:12])
+                        boundary_time = float(line[7:])
                         print(abs(boundary_time - word_data.data[current_key][1]))
                         #if line[7:12] == str(word_data.data[current_key][1])[0:5]:  # Account for precision problems
                         if abs(boundary_time - word_data.data[current_key][1]) < 0.14:
@@ -196,11 +196,10 @@ def combine_files(python_output, praat_output, output_path=''):
         praat_lines = praat_file.readlines()
     file_name = python_output[0:-16].split("/")[1] # TODO, this is gamey
     #file_name = file_namer("combined_data", ".txt", output_path="Readable outputs/")
-
     with open(output_path + file_name + '.txt', "w", encoding='utf8') as my_file:
         for key, value in word_data.data.items():
             word_category = get_word_category(key)
-            if word_category== 0:
+            if word_category == 0:
                 continue
             my_file.write(key + "\n")
             # IPA Unicode conversion based on UCL system
@@ -214,19 +213,35 @@ def combine_files(python_output, praat_output, output_path=''):
 
             closure_check = True  # Used to write "Closure: " if there is no closure present,
                                   # for data processing purposes
+            # while True:
+            #     if line_index == len(praat_lines)-1:
+            #         break
+            #
+            #     if closure_check:
+            #         if praat_lines[line_index][0:3] != "Clo":
+            #             my_file.write("Closure: \n")
+            #         closure_check = False
+            #
+            #     if praat_lines[line_index] == "\n":
+            #         line_index += 1
+            #         my_file.write("\n")
+            #         break
+            #
+            #     my_file.write(praat_lines[line_index])
+            #     line_index += 1
+
             while True:
+                if len(praat_lines) == 0:
+                    break
                 if closure_check:
                     if praat_lines[line_index][0:3] != "Clo":
                         my_file.write("Closure: \n")
                     closure_check = False
 
-                if praat_lines[line_index] == "\n":
-                    line_index += 1
-                    my_file.write("\n")
-                    break
-
-                my_file.write(praat_lines[line_index])
-                line_index += 1
+                if praat_lines[0] == "\n":
+                     my_file.write(praat_lines.pop(0))
+                     break
+                my_file.write(praat_lines.pop(0))
 
 def txt_to_csv(file_path, output_path):
     """
@@ -288,6 +303,7 @@ def csv_to_xlsx(file_path='', output_path='', mode='a', append_target=None, dire
 
     if mode == 'wd':
         files = os.listdir(directory_path)
+        print(files)
         directory_path += "/"
         # TODO: fix slashes
         complete_df = pd.read_csv(directory_path + files[0], header=None)
@@ -295,6 +311,7 @@ def csv_to_xlsx(file_path='', output_path='', mode='a', append_target=None, dire
         df_list = [complete_df]
 
         for file in os.listdir(directory_path):
+            print(file)
             current_df = pd.read_csv(directory_path + file, header=None)
             current_df.columns = column_names
             df_list.append(current_df)
@@ -367,25 +384,31 @@ def main2():
     os.system("C:/Users/rober/Documents/Praat.exe" + " --open " + "C:/Users/rober/Downloads/016_3(1).TextGrid")
 
 def main():
-    mode = input("[Pr]e or [Po]st Praat script?")
-    if input == "Pr":
-        pass
-    if input == "Po":
-        pass
-
+    mode = input("[Pre] or [Po]st Process files?")
+    if mode == "Pre":
+        files = os.listdir("Test TextGrids")
+        for file in files:
+            if file[-1] == "d":
+                preprocess_file("Test TextGrids/" + file, True, output_path="Preprocessed files/", pickle_path="Pickles/")
+    if mode == "Po":
+        praat_outputs = os.listdir("Script Outputs")
+        for output in praat_outputs:
+            combine_files("Pickles/" + output[9:] + ".TextGrid.pickle", "Script Outputs/" + output, "Readable outputs/")
+    if mode == "Co":
+        for file in os.listdir("Readable outputs"):
+            txt_to_csv("Readable outputs/" + file, "csv files/")
+        csv_to_xlsx(mode='wd', directory_path="csv files/")
 if __name__ == "__main__":
-    # main2()
-    files = os.listdir("Tests")
-    for file in files:
-        print(file)
-    # for file in files:
-    #     if file[-1] == "d":
-    #         preprocess_file("Tests/" + file, True)
+    main()
+    #combine_files("Pickles/002-2_2_part_1.TextGrid.Pickle", "Script Outputs/scroutmod002-2_2_part_1")
+
+    #preprocess_file("Test TextGrids/016_2_Part2.TextGrid", True, output_path="Preprocessed files/", pickle_path="Pickles/")
+
     #preprocess_file("Tests/baseline_male_finished.TextGrid", modify=True,
     #               output_path="Preprocessed files/", pickle_path="Pickles/")
     #combine_files("Pickles/baseline_male_finished" + ".TextGrid.pickle", "Script Outputs/scroutmodbaseline_male_finished"
     #              , output_path='Readable outputs/')
     #txt_to_csv("Readable outputs/baseline_male_finished.txt", "csv files/")
     #csv_to_xlsx("csv files/baseline_male_finished2.csv", mode='w', append_target='csv files/output9.xlsx')
-    csv_to_xlsx(directory_path='csv files', mode='wd')
+    #csv_to_xlsx(directory_path='csv files', mode='wd')
     # TODO standardize function docstrings
