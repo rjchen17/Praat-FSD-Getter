@@ -158,7 +158,8 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
                         boundary_time = float(line[7:])
                         print(abs(boundary_time - word_data.data[current_key][1]))
                         #if line[7:12] == str(word_data.data[current_key][1])[0:5]:  # Account for precision problems
-                        if abs(boundary_time - word_data.data[current_key][1]) < 0.14:
+                        #if abs(boundary_time - word_data.data[current_key][1]) < 0.14:
+                        if boundary_time > word_data.data[current_key][1]:
                             current_word_index += 1
                             current_key = word_data.get_key(current_word_index)
                             current_word = current_key.partition("_")[0]
@@ -195,7 +196,7 @@ def combine_files(python_output, praat_output, output_path=''):
     with open(praat_output, "r") as praat_file:
         praat_lines = praat_file.readlines()
     file_name = python_output[0:-16].split("/")[1] # TODO, this is gamey
-    #file_name = file_namer("combined_data", ".txt", output_path="Readable outputs/")
+    #file_name = file_namer("combined_data", ".txt", output_path="4_ReadableOutputs/")
     with open(output_path + file_name + '.txt', "w", encoding='utf8') as my_file:
         for key, value in word_data.data.items():
             word_category = get_word_category(key)
@@ -242,6 +243,11 @@ def combine_files(python_output, praat_output, output_path=''):
                      my_file.write(praat_lines.pop(0))
                      break
                 my_file.write(praat_lines.pop(0))
+def modify_script_output(file_path, output_path):
+    file_name = file_path[9:]
+    with open(output_path + file_name, "w") as new_file:
+        pass
+
 
 def txt_to_csv(file_path, output_path):
     """
@@ -385,30 +391,45 @@ def main2():
 
 def main():
     mode = input("[Pre] or [Po]st Process files?")
+    setup_required = input("Setup directories? (select N if directories already made): Y/N")
+    if setup_required == "Y":
+        default_directories = input("Use default directory names? Y/N")
+        if default_directories == "N":
+            pass # TODO
+    directory_dictionary = {"Input TextGrids": "1_Test TextGrids", "Preprocessed Files": "2_PreprocessedFiles", "Script Outputs": "3_ScriptOutputs", "Pickles": "3_Pickles",
+                            "Readable Outputs": "4_ReadableOutputs", "csv Files": "5_csvFiles"} # A dictionary that maps directories necessary for processing -> directory names
+
     if mode == "Pre":
-        files = os.listdir("Test TextGrids")
+        files = os.listdir(directory_dictionary["Input TextGrids"])
         for file in files:
-            if file[-1] == "d":
-                preprocess_file("Test TextGrids/" + file, True, output_path="Preprocessed files/", pickle_path="Pickles/")
+            preprocess_file(directory_dictionary["Input TextGrids"] + file, True, output_path="2_PreprocessedFiles/", pickle_path="3_Pickles/")
     if mode == "Po":
-        praat_outputs = os.listdir("Script Outputs")
-        for output in praat_outputs:
-            combine_files("Pickles/" + output[9:] + ".TextGrid.pickle", "Script Outputs/" + output, "Readable outputs/")
-    if mode == "Co":
-        for file in os.listdir("Readable outputs"):
-            txt_to_csv("Readable outputs/" + file, "csv files/")
-        csv_to_xlsx(mode='wd', directory_path="csv files/")
+        # Generate your readable outputs
+        for output in os.listdir(directory_dictionary["Script Outputs"]):
+            combine_files(python_output="3_Pickles/" + output[9:] + ".TextGrid.pickle", praat_output="3_ScriptOutputs/" + output, output_path="4_ReadableOutputs/")
+        # Create your csv files
+        for file in os.listdir("4_ReadableOutputs"):
+            txt_to_csv(file_path="4_ReadableOutputs/" + file, output_path="5_csvFiles/")
+        # Create your xlsx
+        csv_to_xlsx(mode='wd', directory_path="5_csvFiles/")
+
+    with open("3_ScriptOutputs/scroutmod002-3_2", "r") as my_file:
+        blocks = []
+        block = []
+        for line in my_file.readlines():
+            if line == "\n":
+                blocks.append(block)
+                block = []
+            block.append(line)
+        print(len(blocks))
+        print(blocks[118])
+    return
+def debug2():
+    preprocess_file(file_path="1_Test TextGrids/016_3.TextGrid", modify=True, output_path="Test Outputs/", pickle_path="Test Outputs/")
 if __name__ == "__main__":
-    main()
-    #combine_files("Pickles/002-2_2_part_1.TextGrid.Pickle", "Script Outputs/scroutmod002-2_2_part_1")
+    debug2()
+    #main()
 
-    #preprocess_file("Test TextGrids/016_2_Part2.TextGrid", True, output_path="Preprocessed files/", pickle_path="Pickles/")
-
-    #preprocess_file("Tests/baseline_male_finished.TextGrid", modify=True,
-    #               output_path="Preprocessed files/", pickle_path="Pickles/")
-    #combine_files("Pickles/baseline_male_finished" + ".TextGrid.pickle", "Script Outputs/scroutmodbaseline_male_finished"
-    #              , output_path='Readable outputs/')
-    #txt_to_csv("Readable outputs/baseline_male_finished.txt", "csv files/")
-    #csv_to_xlsx("csv files/baseline_male_finished2.csv", mode='w', append_target='csv files/output9.xlsx')
-    #csv_to_xlsx(directory_path='csv files', mode='wd')
     # TODO standardize function docstrings
+
+
