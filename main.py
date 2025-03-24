@@ -3,6 +3,7 @@ from tkinter import filedialog
 import os
 import pickle
 import pandas as pd
+import re
 
 class WordDictionary:
     def __init__(self):
@@ -33,6 +34,18 @@ class WordDictionary:
     def getValue(self, n): # Gets value at index
         key = self.get_key(n)
         return self.data[key]
+class WordCounter:
+    def __init__(self):
+        self.counter = {}
+
+    def add(self, word):
+        if word in self.counter:
+            self.counter[word] += 1
+        else:
+            self.counter[word] = 1
+
+    def reset(self):
+        self.counter = {}
 
 def file_namer(file_name, handle, output_path: '') -> str:  # TODO: Implement keyword argument
     ''' Test
@@ -134,7 +147,7 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
                 if word_category == 0:
                     pass
                 if word_category == 1:
-                    if line[8:11].lower() == "c1r" or line[8:10].lower() == "c1":
+                    if line[8:11].lower() == "c1r": #or line[8:10].lower() == "c1":
                         line = "text = \"t\""
 
                 if word_category == 2:
@@ -175,13 +188,14 @@ def preprocess_file(file_path, modify=False, output_path='', pickle_path=''):
                 # DEBUG:
                 print(current_key + "///" + str(word_data.data[current_key][1]))
                 print(line)
+    '''
     with open(pickle_path + file_pickle_path + '.pickle', 'wb') as word_data_file:
         try:
             pickle.dump(word_data, word_data_file, protocol=pickle.HIGHEST_PROTOCOL)  # TODO: check highest_protocol
         except:
             print("Pickle error. Your version of Python may be outdated. ")
             raise ValueError # TODO: Temp
-
+    '''
 
 def combine_files(python_output, praat_output, output_path=''):
     """ Combines python and praat outputs into a readable file
@@ -258,12 +272,47 @@ def txt_to_csv(file_path, output_path):
     """
     split_file = file_splitter(file_path) # Returns filename.handle
     file_without_handle = split_file.split(".")[0] # Returns filename
+    file_without_handle = file_without_handle[9:] # Removes scroutmod
 
-    new_file_lines = file_without_handle + ","
+    new_file_lines = ""
     with open(file_path, "r", encoding='utf8') as my_file:
         lines = my_file.readlines()
-    for line in lines[0:-1]: # [0:-1] cuts off the last newline. Without doing so, we would have an
+    block = []
+    for line in lines: # [0:-1] cuts off the last newline. Without doing so, we would have an
                              # extra file_without_handle at the end"
+        if line == "\n":
+            if len(block) == 14:
+                block.insert(0, "Closure: ")
+            if len(block) == 16:
+                # Debugging purposes
+                print("Popping")
+                block.pop(0)
+            new_file_lines += file_without_handle + ","
+            try:
+                word_category = get_word_category(block[6])
+            except IndexError:
+                print("Error")
+                print(block)
+                return
+            new_file_lines += block[6][0:-1] + ","
+            new_file_lines += block[7][0:-1] + ","
+            if word_category > 2:
+                new_file_lines += "ʂ,"
+            else:
+                new_file_lines += "ʈʂ,"
+            for i, block_line in enumerate(block):
+                if i == 6 or i == 7:
+                    continue
+                try:
+                    new_file_lines += block_line.split(":")[1][1:-1] + ","
+                except IndexError:
+                    pass
+            new_file_lines += "\n"
+            block = []
+            continue
+
+        block.append(line)
+        '''
         if line != "\n":
             split_line = line.split(":")
             if len(split_line) > 1:
@@ -274,9 +323,10 @@ def txt_to_csv(file_path, output_path):
         else:
             new_file_lines += "\n"
             new_file_lines += file_without_handle + ","
-
-    file_name = file_namer(file_without_handle, handle='.csv', output_path=output_path)
+        '''
+    file_name = output_path + file_without_handle + ".csv"
     with open(file_name, "w", encoding='utf8') as new_file:
+        print(new_file)
         new_file.write(new_file_lines)
 
 def csv_to_xlsx(file_path='', output_path='', mode='a', append_target=None, directory_path=None):
@@ -304,14 +354,13 @@ def csv_to_xlsx(file_path='', output_path='', mode='a', append_target=None, dire
     if mode != 'wd':
         file_without_handle: str = file_path.split(".")[0] # Filename string
         input_df = pd.read_csv(file_path, header=None)
-    column_names = ["file", "word", "phone", "word_dur", "closure_dur", "release_dur", "cog", "skew", "sd",
-                    "fricative_f3", "vowel", "f1_20", "f1_40", "f2_20", "f2_40", "f3_20", "f3_40", "UNK"]
+    column_names = ["file", "word", "word_count", "word_dur", "phone", "closure_dur", "release_dur", "cog", "skew", "sd",
+                    "fricative_f3", "vowel_dur", "f1_20", "f1_40", "f2_20", "f2_40", "f3_20", "f3_40", "UNK"]
 
     if mode == 'wd':
         files = os.listdir(directory_path)
         print(files)
-        directory_path += "/"
-        # TODO: fix slashes
+
         complete_df = pd.read_csv(directory_path + files[0], header=None)
         complete_df.columns = column_names
         df_list = [complete_df]
@@ -320,10 +369,11 @@ def csv_to_xlsx(file_path='', output_path='', mode='a', append_target=None, dire
             print(file)
             current_df = pd.read_csv(directory_path + file, header=None)
             current_df.columns = column_names
+            print(file)
             df_list.append(current_df)
         # TODO: Fix this:
         complete_df = pd.concat(df_list, ignore_index=True)
-        complete_df.to_excel(directory_path + "complete_data.xlsx", index=False)
+        complete_df.to_excel(directory_path + "baseline_data.xlsx", index=False)
 
     if mode == 'w':
         # TODO
@@ -335,60 +385,42 @@ def csv_to_xlsx(file_path='', output_path='', mode='a', append_target=None, dire
         append_target_df = pd.read_excel(append_target)
         output_df = pd.concat([input_df, append_target_df])
         output_df.to_excel(file_without_handle + ".xlsx", index=False)
-def subprocess_test():
-    subprocess.run(["C:/Praat.exe"])
+def count_words(directory):
+    '''
+    A function that takes a directory of .csv files and adds a counter for words by filename
+    :param directory:
+    :return:
+    '''
+    files = os.listdir(directory)
+    word_counter = WordCounter() # A mapping from words to their count
+    current_file = files[0][0:6]
+    for file in files:
+        if file[0:6] != current_file:
+            current_file = file[0:6]
+            word_counter.reset()
 
-
-def main3():
-    # Get location of Praat
-    print("Select where your Praat.exe file is located")
-    while True:
-        praat_location = filedialog.askopenfilename()
-        if praat_location[-9:] == "Praat.exe":
-            print("Success!")
-            print("Praat found at: " + praat_location)
-            print()
-            break
-        else:
-            print("Praat not found, please try again.")
-    # Get location of .wav and .TextGrid
-    # Note that this does not work with a .txt or .mp3, for example
-    print("Select both the sound and TextGrid file to be analyzed")
-    sound_file_found = False
-    textgrid_file_found = False
-    while True:
-        files = filedialog.askopenfilenames()
-        if len(files) != 2:
-            print("Please select exactly two files")
-            continue
-        else:
-            for file in files:
-                if file[-3:] == "wav":
-                    sound_file = file
-                    sound_file_found = True
-                elif file[-4:] == "Grid":
-                    textgrid_file = file
-                    textgrid_file_found = True
-        if not sound_file_found or not textgrid_file_found:
-            print("Files not found, please try again.")
-            for file in files:
-                print(file[-3:])
-            continue
-        print("Success!")
-        print("Sound file found at: " + sound_file)
-        print("TextGrid file found at: " + textgrid_file)
-        print()
-        break
-    subprocess.run([praat_location, "--open", sound_file])
-
-
-def main2():
-    subprocess.Popen(["C:/Users/rober/Documents/Praat.exe", "--open",
-                      ["C:/Users/rober/Downloads/016_3(1).TextGrid", "C:/Users/rober/Downloads/019-2_2_part_2.wav"]])
-    # subprocess.Popen(["C:/Users/rober/Documents/Praat.exe", "--open", ])
-    os.system("C:/Users/rober/Documents/Praat.exe" + " --open " + "C:/Users/rober/Downloads/016_3(1).TextGrid")
-    os.system("C:/Users/rober/Documents/Praat.exe" + " --open " + "C:/Users/rober/Downloads/016_3(1).TextGrid")
-
+        new_lines = ""
+        with open(directory + file, encoding='utf-8') as my_file:
+            for line in my_file.readlines():
+                print(line)
+                line_as_list = line.split(",")
+                word_counter.add(line_as_list[1])
+                line_as_list.insert(2, word_counter.counter[line_as_list[1]])
+                new_lines += ",".join(str(element) for element in line_as_list)
+        with open("6_countedcsv/" + file, "w", encoding='utf-8') as new_file:
+            new_file.write(new_lines)
+def postprocess_files():
+    """
+    This function serves as a wrapper for ALL functions after script outputs have been obtained.
+    This function uses the default directories (i.e. it gets its script outputs from "3_ScriptOutputs".
+    This function will write from a directory of .txt's to a single xlsx.
+    :return:
+    """
+    for file in os.listdir("3_ScriptOutputs"):
+        txt_to_csv("3_ScriptOutputs/" + file, "5_csvFiles/")
+    count_words("5_csvFiles/")
+    csv_to_xlsx(mode='wd', directory_path='6_countedcsv/')
+    add_vowels("6_countedcsv/baseline_data.xlsx", "8_xlsx/")
 def main():
     mode = input("[Pre] or [Po]st Process files?")
     setup_required = input("Setup directories? (select N if directories already made): Y/N")
@@ -402,34 +434,67 @@ def main():
     if mode == "Pre":
         files = os.listdir(directory_dictionary["Input TextGrids"])
         for file in files:
-            preprocess_file(directory_dictionary["Input TextGrids"] + file, True, output_path="2_PreprocessedFiles/", pickle_path="3_Pickles/")
+            preprocess_file(directory_dictionary["Input TextGrids"] + "/" + file, True, output_path="2_PreprocessedFiles/", pickle_path="3_Pickles/")
     if mode == "Po":
         # Generate your readable outputs
-        for output in os.listdir(directory_dictionary["Script Outputs"]):
-            combine_files(python_output="3_Pickles/" + output[9:] + ".TextGrid.pickle", praat_output="3_ScriptOutputs/" + output, output_path="4_ReadableOutputs/")
+        #for output in os.listdir(directory_dictionary["Script Outputs"]):
+        #    combine_files(python_output="3_Pickles/" + output[9:] + ".TextGrid.pickle", praat_output="3_ScriptOutputs/" + output, output_path="4_ReadableOutputs/")
         # Create your csv files
-        for file in os.listdir("4_ReadableOutputs"):
-            txt_to_csv(file_path="4_ReadableOutputs/" + file, output_path="5_csvFiles/")
+        for file in os.listdir("3_ScriptOutputs"):
+            txt_to_csv(file_path="3_ScriptOutputs/" + file, output_path="5_csvFiles/")
         # Create your xlsx
-        csv_to_xlsx(mode='wd', directory_path="5_csvFiles/")
+        #csv_to_xlsx(mode='wd', directory_path="5_csvFiles/")
+def pinyin_to_XSAMPA(vowel: str):
+    """ Returns an X-SAMPA representation of a vowel given a pinyin string
 
-    with open("3_ScriptOutputs/scroutmod002-3_2", "r") as my_file:
-        blocks = []
-        block = []
-        for line in my_file.readlines():
-            if line == "\n":
-                blocks.append(block)
-                block = []
-            block.append(line)
-        print(len(blocks))
-        print(blocks[118])
-    return
-def debug2():
-    preprocess_file(file_path="1_Test TextGrids/016_3.TextGrid", modify=True, output_path="Test Outputs/", pickle_path="Test Outputs/")
+    :param vowel: Vowel in pinyin
+    :return: X-SAMPA IPA phone
+    """
+    if vowel == "i":
+        return "ɻ"
+    elif vowel == "ua":
+        return "ua"
+    elif vowel == "a":
+        return "a"
+    elif vowel == "ao":
+        return "aʊ"
+    elif vowel == "u":
+        return "u"
+    elif vowel == "ou":
+        return "oʊ"
+    elif vowel == "e":
+        return "ɤ"
+def add_vowels(file_path: str, output_path: str):
+    table = pd.read_excel(file_path)
+    vowels = []
+
+    for index, row in table.iterrows():
+        match = re.search(r"(?<=(ch|sh))[aeiou]+", row["word"])
+        if match is not None:
+            vowels.append(pinyin_to_XSAMPA(match.group()))
+        else:
+            print("Error. Word not found, instead found:")
+            print(row["word"])
+            vowels.append("")
+
+    table["vowel"] = vowels
+    table.to_excel(output_path + "complete_data.xlsx", index=False)
 if __name__ == "__main__":
-    debug2()
+    #preprocess_file(file_path="1_Test TextGrids/046-3_2.TextGrid", modify=True, output_path="2_PreprocessedFiles/")
+    #count_words("7_baselines/")
     #main()
-
-    # TODO standardize function docstrings
+    #txt_to_csv(file_path="0_Bin/scroutmodbaseline_female_finished.txt", output_path="7_baselines/")
+    #csv_to_xlsx(mode='wd', directory_path="7_baselines/")
+    '''
+    my_df = pd.read_excel("5_csvFiles/baseline_data.xlsx")
+    print(my_df.columns)
+    new_df = pd.DataFrame(zip(my_df.cog, my_df.sd))
+    fig = px.box(new_df)
+    fig.show()
+    '''
+    #count_words("5_csvFiles/")
+    #csv_to_xlsx(directory_path="6_countedcsv/", mode='wd')
+    postprocess_files()
+    #preprocess_file(modify=True, file_path="1_Test TextGrids/034-3_2-final.TextGrid",output_path="0_Log/
 
 
